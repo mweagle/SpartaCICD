@@ -1,0 +1,221 @@
+################################################################################
+# REFERENCES
+# ConcourseCI Docs: https://concourse.ci
+# Concourse tutorial: https://github.com/starkandwayne/concourse-tutorial
+#
+# NOTES
+# This file is a self-contained description of a Concourse CI pipeline
+# to deploy a http://gosparta.io application.  There's a couple of things to 
+# note:
+#   - The YAML uses node references so that scripts can be defined in the 
+#     CONSTANTS key and referenced in the jobs section
+#   - This requires an additional YML file that defines AWS credentials and the
+#     S3 bucket that should be used for code products. Required keys:
+#       s3-bucket: XXXXXX
+#       s3-access-key-id: XXXXXXXXXXXXXXXXXX
+#       s3-secret-access-key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# 
+################################################################################
+# RESOURCES
+################################################################################
+resources:
+- name: SpartaCICD
+  type: git
+  source:
+    uri: https://github.com/mweagle/SpartaCICD
+    branch: master
+
+- name: Version
+  type: semver
+  source:
+    bucket: {{s3-bucket}} 
+    region_name: us-west-2
+    key: SpartaCICDSemVer
+    access_key_id: {{s3-access-key-id}}
+    secret_access_key: {{s3-secret-access-key}}
+    
+- name: SourceArchive
+  type: s3
+  source:
+    bucket: {{s3-bucket}} 
+    regexp: SpartaCICD-(.*).tgz
+    region_name: us-west-2
+    access_key_id: {{s3-access-key-id}}
+    secret_access_key: {{s3-secret-access-key}}
+    
+################################################################################
+# JOBS
+################################################################################   
+jobs:
+  - name: Package
+    serial_groups: [Version]
+    plan:
+    - get: SpartaCICD
+      trigger: true
+    - get: Version
+      params: {pre: rc}
+    - task: package
+      config:
+        << : *CONFIG
+        inputs:
+          - name: SpartaCICD
+          - name: Version
+        run:
+          path: sh
+          args:
+          - -exc
+          - *PACKAGE_SCRIPT  
+        outputs:
+          - name: build  
+    - put: SourceArchive
+      params: {file: build/SpartaCICD-*.tgz*}    
+    - put: Version
+      params: {file: Version/number}
+       
+  - name: UnitTests
+    plan: 
+    - get: SourceArchive
+      passed: [Package]
+      trigger: true
+    - task: unit-test
+      config:
+        << : *CONFIG
+        inputs:
+          - name: SourceArchive
+        run:
+          path: sh
+          args:
+          - -exc
+          - *UNIT_TEST_SCRIPT  
+
+  - name: Build
+    plan: 
+    - get: SourceArchive
+      passed: [UnitTests]
+      trigger: true
+    - task: build
+      config:
+        << : *CONFIG
+        inputs:
+          - name: SourceArchive
+        run:
+          path: sh
+          args:
+          - -exc
+          - *BUILD_SCRIPT  
+        outputs:
+        - name: build            
+        
+  - name: Provision
+    plan: 
+    - get: SourceArchive
+      passed: [Build]
+      trigger: true
+    - task: deploy
+      config:
+        << : *CONFIG
+        inputs:
+          - name: SourceArchive
+        params:        
+          << : *AWS_CREDENTIALS
+        run:
+          path: sh
+          args:
+          - -exc
+          - *PROVISION_SCRIPT    
+          
+  - name: AcceptanceTests
+    plan: 
+    - get: SourceArchive
+      passed: [Provision]
+      trigger: true
+    - task: deploy
+      config:
+        << : *CONFIG
+        inputs:
+          - name: SourceArchive
+        params:   
+          << : *AWS_CREDENTIALS
+        run:
+          path: sh
+          args:
+          - -exc
+          - *ACCEPTANCE_TEST_SCRIPT            
+
+
+################################################################################
+# GROUPS
+################################################################################
+groups:
+- name: SpartaCICD
+  jobs:
+  - Package
+  - UnitTests
+  - Build
+  - Provision
+  - AcceptanceTests
+  
+  
+################################################################################
+# CONSTANTS
+################################################################################
+CONSTANTS:
+  - AWS_CREDENTIALS: &AWS_CREDENTIALS
+      AWS_REGION: {{aws-region}}
+      AWS_ACCESS_KEY_ID: {{s3-access-key-id}}
+      AWS_SECRET_ACCESS_KEY: {{s3-secret-access-key}} 
+  - CONFIG: &CONFIG 
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: golang
+          tag: '1.6'
+  - PACKAGE_SCRIPT: &PACKAGE_SCRIPT |
+        cd Version
+          SEM_NUMBER=`cat number`
+          SEM_VERSION=`cat version`
+          echo "SEM_NUMBER=$SEM_NUMBER, SEM_VERSION=$SEM_VERSION"
+        cd ..
+
+        cd SpartaCICD
+          if [ ! -d ./vendor ]
+            then
+              echo "./vendor does not exist - fetching packages"
+              go get -d -v ./...   
+              ls -la $GOPATH/src  
+              # Move the $GOPATH/src contents into /.vendor
+              mv  $GOPATH/src ./vendor
+          fi
+        cd ..
+
+        mkdir -pv build
+
+        # TAR everything up...
+        OUTPUT_FILE="./build/SpartaCICD-$SEM_NUMBER.tgz"
+        tar -zcf $OUTPUT_FILE --exclude=".git" ./SpartaCICD
+
+  - UNIT_TEST_SCRIPT: &UNIT_TEST_SCRIPT |
+      tar -xf ./SourceArchive/*.tgz 
+      mv ./SpartaCICD $GOPATH/src
+      cd  $GOPATH/src/SpartaCICD
+      go test -v -tags=unit .    
+      
+  - BUILD_SCRIPT: &BUILD_SCRIPT |
+      tar -xf ./SourceArchive/*.tgz 
+      mv ./SpartaCICD $GOPATH/src
+      cd  $GOPATH/src/SpartaCICD
+      go build . 
+      
+  - PROVISION_SCRIPT: &PROVISION_SCRIPT |
+      tar -xf ./SourceArchive/*.tgz 
+      mv ./SpartaCICD $GOPATH/src
+      cd  $GOPATH/src/SpartaCICD
+      go build -o SpartaProvision .
+      ./SpartaProvision --level info provision --s3Bucket {{s3-bucket}} 
+      
+  - ACCEPTANCE_TEST_SCRIPT: &ACCEPTANCE_TEST_SCRIPT |
+      tar -xf ./SourceArchive/*.tgz 
+      mv ./SpartaCICD $GOPATH/src
+      cd  $GOPATH/src/SpartaCICD
+      go test -v -tags=acceptance .
