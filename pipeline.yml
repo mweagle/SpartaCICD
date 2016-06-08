@@ -24,15 +24,6 @@ resources:
   source:
     uri: https://github.com/mweagle/SpartaCICD
     branch: master
-
-- name: Version
-  type: semver
-  source:
-    bucket: {{s3-bucket}} 
-    region_name: us-west-2
-    key: SpartaCICDSemVer
-    access_key_id: {{s3-access-key-id}}
-    secret_access_key: {{s3-secret-access-key}}
     
 - name: SourceArchive
   type: s3
@@ -48,18 +39,14 @@ resources:
 ################################################################################   
 jobs:
   - name: Package
-    serial_groups: [Version]
     plan:
     - get: SpartaCICD
       trigger: true
-    - get: Version
-      params: {pre: rc}
     - task: package
       config:
         << : *CONFIG
         inputs:
           - name: SpartaCICD
-          - name: Version
         run:
           path: sh
           args:
@@ -69,8 +56,6 @@ jobs:
           - name: build  
     - put: SourceArchive
       params: {file: build/SpartaCICD-*.tgz*}    
-    - put: Version
-      params: {file: Version/number}
        
   - name: UnitTests
     plan: 
@@ -172,11 +157,12 @@ CONSTANTS:
           repository: golang
           tag: '1.6'
   - PACKAGE_SCRIPT: &PACKAGE_SCRIPT |
-        cd Version
-          SEM_NUMBER=`cat number`
-          SEM_VERSION=`cat version`
-          echo "SEM_NUMBER=$SEM_NUMBER, SEM_VERSION=$SEM_VERSION"
-        cd ..
+        # cd Version
+        #   SEM_NUMBER=`cat number`
+        #   SEM_VERSION=`cat version`
+        #   echo "SEM_NUMBER=$SEM_NUMBER, SEM_VERSION=$SEM_VERSION"
+        # cd ..
+        SEM_NUMBER=`date +%s`
 
         cd SpartaCICD
           if [ ! -d ./vendor ]
