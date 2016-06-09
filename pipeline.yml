@@ -12,8 +12,8 @@
 #   - This requires an additional YML file that defines AWS credentials and the
 #     S3 bucket that should be used for code products. Required keys:
 #       s3-bucket: XXXXXX
-#       s3-access-key-id: XXXXXXXXXXXXXXXXXX
-#       s3-secret-access-key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#       access-key-id: XXXXXXXXXXXXXXXXXX
+#       secret-access-key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # 
 ################################################################################
 # RESOURCES
@@ -24,6 +24,15 @@ resources:
   source:
     uri: https://github.com/mweagle/SpartaCICD
     branch: master
+
+- name: Version
+  type: semver
+  source:
+    bucket: {{s3-bucket}} 
+    region_name: us-west-2
+    key: SpartaCICDSemVer
+    access_key_id: {{access-key-id}}
+    secret_access_key: {{secret-access-key}}
     
 - name: SourceArchive
   type: s3
@@ -31,22 +40,26 @@ resources:
     bucket: {{s3-bucket}} 
     regexp: SpartaCICD-(.*).tgz
     region_name: us-west-2
-    access_key_id: {{s3-access-key-id}}
-    secret_access_key: {{s3-secret-access-key}}
+    access_key_id: {{access-key-id}}
+    secret_access_key: {{secret-access-key}}
     
 ################################################################################
 # JOBS
 ################################################################################   
 jobs:
   - name: Package
+    serial_groups: [Version]
     plan:
     - get: SpartaCICD
       trigger: true
+    - get: Version
+      params: {pre: rc}
     - task: package
       config:
         << : *CONFIG
         inputs:
           - name: SpartaCICD
+          - name: Version
         run:
           path: sh
           args:
@@ -56,6 +69,8 @@ jobs:
           - name: build  
     - put: SourceArchive
       params: {file: build/SpartaCICD-*.tgz*}    
+    - put: Version
+      params: {file: Version/number}
        
   - name: UnitTests
     plan: 
@@ -147,8 +162,8 @@ groups:
 CONSTANTS:
   - AWS_CREDENTIALS: &AWS_CREDENTIALS
       AWS_REGION: {{aws-region}}
-      AWS_ACCESS_KEY_ID: {{s3-access-key-id}}
-      AWS_SECRET_ACCESS_KEY: {{s3-secret-access-key}} 
+      AWS_ACCESS_KEY_ID: {{access-key-id}}
+      AWS_SECRET_ACCESS_KEY: {{secret-access-key}} 
   - CONFIG: &CONFIG 
       platform: linux
       image_resource:
@@ -157,19 +172,18 @@ CONSTANTS:
           repository: golang
           tag: '1.6'
   - PACKAGE_SCRIPT: &PACKAGE_SCRIPT |
-        # cd Version
-        #   SEM_NUMBER=`cat number`
-        #   SEM_VERSION=`cat version`
-        #   echo "SEM_NUMBER=$SEM_NUMBER, SEM_VERSION=$SEM_VERSION"
-        # cd ..
-        SEM_NUMBER=`date +%s`
+        cd Version
+          SEM_NUMBER=`cat number`
+          SEM_VERSION=`cat version`
+          echo "SEM_NUMBER=$SEM_NUMBER, SEM_VERSION=$SEM_VERSION"
+        cd ..
 
         cd SpartaCICD
           if [ ! -d ./vendor ]
             then
               echo "./vendor does not exist - fetching packages"
+              ls -la .
               go get -d -v ./...   
-              ls -la $GOPATH/src  
               # Move the $GOPATH/src contents into /.vendor
               mv  $GOPATH/src ./vendor
           fi
