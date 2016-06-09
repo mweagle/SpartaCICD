@@ -13,10 +13,7 @@ POSTGRES_CONNECTION_STRING={{ .DBInstanceUser }}:{{ .DBInstancePassword }}@$POST
 # 
 # Tested on Ubuntu 16.04
 #
-
 # AMI: ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20160516.1 (ami-06b94666)
-# TODO: Add us to crontab so that we'll be run after each reboot
-# Ref: http://www.cyberciti.biz/faq/linux-execute-cron-job-after-system-reboot/
 if [ ! -f "/home/ubuntu/userdata.sh" ]
 then
   curl -vs http://169.254.169.254/latest/user-data -o /home/ubuntu/userdata.sh
@@ -43,7 +40,6 @@ then
   curl -vs -L $CONCOURSE_DOWNLOAD_URL -o /home/ubuntu/concourse 
   chmod +x /home/ubuntu/concourse 
 fi
-    
 
 rm -fv /home/ubuntu/*key*
 ssh-keygen -t rsa -f /home/ubuntu/host_key -N '' 
