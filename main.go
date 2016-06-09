@@ -15,8 +15,8 @@ import (
 	spartaCF "github.com/mweagle/Sparta/aws/cloudformation"
 	spartaIAM "github.com/mweagle/Sparta/aws/iam"
 
-	"./concourse"
-	"./resources"
+	"github.com/mweagle/SpartaCICD/concourse"
+	"github.com/mweagle/SpartaCICD/resources"
 	"github.com/spf13/cobra"
 	"net/http"
 	"os"
