@@ -21,7 +21,6 @@ if [ ! -f "/home/ubuntu/userdata.sh" ]
 then
   curl -vs http://169.254.169.254/latest/user-data -o /home/ubuntu/userdata.sh
   chmod +x /home/ubuntu/userdata.sh
-  #grep '@reboot /home/ubuntu/userdata.sh' /etc/crontab || echo '*/5 *  *  *  * root /home/ubuntu/userdata.sh' >> /etc/crontab
   apt-get install supervisor -y
 fi
 
@@ -145,7 +144,6 @@ stderr_capture_maxbytes=1MB
 stderr_events_enabled=false
 "
 echo "$SPARTA_CI_CD_SYNC_SUPERVISOR_CONF" > /etc/supervisor/conf.d/spartasync.conf
-
 
 # Patch up the directory
 chown -R ubuntu:ubuntu /home/ubuntu
