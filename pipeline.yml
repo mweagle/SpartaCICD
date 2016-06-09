@@ -212,7 +212,7 @@ CONSTANTS:
       mv ./SpartaCICD $GOPATH/src
       cd  $GOPATH/src/SpartaCICD
       go build -o SpartaProvision .
-      ./SpartaProvision --level info provision --s3Bucket {{s3-bucket}} 
+      ./SpartaProvision --level info provision --s3Bucket {{s3-bucket}}  --key sparta-test
       
   - ACCEPTANCE_TEST_SCRIPT: &ACCEPTANCE_TEST_SCRIPT |
       tar -xf ./SourceArchive/*.tgz 
