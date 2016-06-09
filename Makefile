@@ -52,6 +52,9 @@ update:
 	rm -rf $(GOPATH)/src/github.com/mweagle/CloudFormationResources
 	mkdir -pv $(GOPATH)/src/github.com/mweagle/CloudFormationResources
 	cp $(GOPATH)/CloudFormationResources/*.go $(GOPATH)/src/github.com/mweagle/CloudFormationResources
+	cp $(GOPATH)/SpartaCICD/*.go $(GOPATH)/src/github.com/mweagle/SpartaCICD
+	cp -R $(GOPATH)/SpartaCICD/concourse $(GOPATH)/src/github.com/mweagle/SpartaCICD/concourse
+	cp -R $(GOPATH)/SpartaCICD/resources $(GOPATH)/src/github.com/mweagle/SpartaCICD/resources
 
 build: get generate vet
 	go build .
