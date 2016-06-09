@@ -43,19 +43,6 @@ get: clean
 	git clone --depth=1 https://github.com/asaskevich/govalidator $(GOPATH)/src/github.com/asaskevich/govalidator
 	
 
-update:
-	rm -rf $(GOPATH)/src/github.com/mweagle/Sparta
-	mkdir -pv $(GOPATH)/src/github.com/mweagle/Sparta
-	cp $(GOPATH)/Sparta/*.go $(GOPATH)/src/github.com/mweagle/Sparta
-	cp -R $(GOPATH)/Sparta/aws $(GOPATH)/src/github.com/mweagle/Sparta
-	cp -R $(GOPATH)/Sparta/resources $(GOPATH)/src/github.com/mweagle/Sparta
-	rm -rf $(GOPATH)/src/github.com/mweagle/CloudFormationResources
-	mkdir -pv $(GOPATH)/src/github.com/mweagle/CloudFormationResources
-	cp $(GOPATH)/CloudFormationResources/*.go $(GOPATH)/src/github.com/mweagle/CloudFormationResources
-	cp $(GOPATH)/SpartaCICD/*.go $(GOPATH)/src/github.com/mweagle/SpartaCICD
-	cp -R $(GOPATH)/SpartaCICD/concourse $(GOPATH)/src/github.com/mweagle/SpartaCICD/concourse
-	cp -R $(GOPATH)/SpartaCICD/resources $(GOPATH)/src/github.com/mweagle/SpartaCICD/resources
-
 build: get generate vet
 	go build .
 
@@ -70,7 +57,7 @@ explore:
 
 provision: generate vet
 	clear
-	go run main.go --level info provision --s3Bucket $(S3_BUCKET) --username picard --password captain --key sparta-test
+	go run main.go --level info provision --s3Bucket $(S3_BUCKET) --username picard --password captain 		
 
 describe: generate vet
 	clear
